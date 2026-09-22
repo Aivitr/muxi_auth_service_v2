@@ -1,7 +1,7 @@
 -- 只读预览：迁移 users 里的人事字段到 member_profiles 之前，先把真实数据看清楚。
 -- 不写任何数据，可以随便跑。
 --
--- 第 4、5 项依赖 MySQL 8 的 REGEXP_SUBSTR。如果这里就报错，说明目标库是 5.7，
+-- 第 4 项依赖 MySQL 8 的 REGEXP_SUBSTR。如果这里就报错，说明目标库是 5.7，
 -- 需要先把年份解析改成 SUBSTRING_INDEX 之类的老写法再动 apply 脚本。
 
 -- 1. 候选总数：group 或 timejoin 非空、且不是 CAS 影子账号
@@ -27,12 +27,20 @@ WHERE COALESCE(u.timejoin, '') <> ''
 ORDER BY u.id
 LIMIT 50;
 
--- 4. timejoin 非空但解析不出合法年份的行数
-SELECT '4. unparsable_timejoin' AS metric, COUNT(*) AS value
+-- 4. 迁移后 join_year 会是 NULL 的行数，也就是待人工补录入队年份的工作量。
+--    判据必须和 apply 脚本的 CASE 完全一致：只有「group 非空」的行才会被 INSERT，
+--    且年份解析失败与超出 [2000, 今年] 两种情况的 CASE 都落到 ELSE NULL。
+--    注意 NOT BETWEEN 在这里是错的：正则没匹配到时整个表达式为 NULL，
+--    NOT BETWEEN 也是 NULL，那些行会被 WHERE 静默排除，指标偏低。
+SELECT '4. null_join_year_after_migration' AS metric, COUNT(*) AS value
 FROM users u
-WHERE COALESCE(u.timejoin, '') <> ''
+WHERE COALESCE(u.`group`, '') <> ''
   AND LEFT(COALESCE(u.username, ''), 4) <> 'cas_'
-  AND CAST(NULLIF(REGEXP_SUBSTR(u.timejoin, '(19|20)[0-9]{2}'), '') AS UNSIGNED) NOT BETWEEN 2000 AND YEAR(CURDATE());
+  AND COALESCE(
+        CAST(NULLIF(REGEXP_SUBSTR(u.timejoin, '(19|20)[0-9]{2}'), '') AS UNSIGNED)
+        BETWEEN 2000 AND YEAR(CURDATE()),
+        FALSE
+      ) = FALSE;
 
 -- 5. left = 1 的离职成员。要不要一并迁入需人工拍板：
 --    迁了他们会立刻获得 muxi:member，能过内部系统的 OAuth scope 校验。
