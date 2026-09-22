@@ -1,7 +1,6 @@
 package check
 
 import (
-	"fmt"
 	"github.com/Muxi-X/muxi_auth_service_v2/handler"
 	"github.com/Muxi-X/muxi_auth_service_v2/model"
 	"github.com/Muxi-X/muxi_auth_service_v2/pkg/auth"
@@ -23,9 +22,8 @@ func CheckToken(c *gin.Context) {
 
 	tokenResolve, err := auth.ResolveToken(token)
 	if err != nil {
-		fmt.Println("[email]:", email)
-		fmt.Println("[token]:", token)
-		fmt.Println("[error]:", err.Error())
+		// 不要在这里打印 token/email：本端点公开无鉴权，任何人都能拿一个坏 token
+		// 把当次请求的凭据推进日志，而日志的留存期比 token 的 7 天有效期还长。
 		handler.SendError(c, errno.ErrTokenInvalid, nil, err.Error())
 		return
 	}

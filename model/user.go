@@ -2,7 +2,6 @@ package model
 
 import (
 	"encoding/base64"
-	"fmt"
 	"strconv"
 
 	"github.com/Muxi-X/muxi_auth_service_v2/pkg/constvar"
@@ -154,13 +153,14 @@ func GetEmailByUsername(username string) (string, error) {
 	return user.Email, d.Error
 }
 
+// VerifyCaptcha 校验密码重置验证码。
+// 不要在这里打印 oldCap/newCap：明文进日志等于把密码重置流程交出去。
 func (user *UserModel) VerifyCaptcha(newCap string) bool {
 	oldCap, err := captcha.ResolveCaptchaToken(user.ResetT)
 	if err != nil {
-		fmt.Println(err.Error())
+		logx.Error("Failed to resolve captcha token", "error", err)
 		return false
 	}
-	fmt.Println(oldCap, newCap)
 	return oldCap == newCap
 }
 

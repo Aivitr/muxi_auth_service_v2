@@ -289,3 +289,20 @@ Response Data:
 - 如何拼接 CAS 登录 URL
 - 如何从授权码继续换取 `access_token`
 - 常见联调报错的排查方法
+
+## 已知风险
+
+**公开的账号枚举端点。** 下面三个端点无鉴权、无频率限制：
+
+| 端点 | 返回 |
+|---|---|
+| `GET /auth/api/email?username=` | 该用户名的邮箱地址 |
+| `GET /auth/api/check_name?username=` | 用户名是否已被占用 |
+| `GET /auth/api/check_email?email=` | 邮箱是否已注册 |
+
+`/check_name` 与 `/check_email` 是注册流程的刚需（前端实时查重），只回布尔值。
+`/email` 会把真实邮箱吐出来，攻击者能用用户名批量枚举邮箱，再拿 `/password/get_captcha`
+撞密码重置流程；重置的最后一步仍需要读受害者邮箱里的验证码，所以它换来的是隐私泄漏
+和一份可用的钓鱼/撞库输入，不足以直接接管账号。
+
+缓解方向（尚未实施）：给这三个端点加按 IP 的限流，或让 `/email` 也走某种校验。
