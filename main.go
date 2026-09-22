@@ -10,6 +10,7 @@ import (
 	"github.com/Muxi-X/muxi_auth_service_v2/pkg/logx"
 	"github.com/Muxi-X/muxi_auth_service_v2/pkg/oauth"
 	"github.com/Muxi-X/muxi_auth_service_v2/router"
+	"github.com/Muxi-X/muxi_auth_service_v2/router/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/pflag"
@@ -40,7 +41,11 @@ func main() {
 	gin.SetMode(viper.GetString("runmode"))
 
 	// Create the Gin engine.
-	g := gin.Default()
+	// 不用 gin.Default()：它的 access log 会把整条 query string 打出来，
+	// 而 /auth/api/check_token 的 token 本身就是 7 天有效的登录凭据。
+	// Recovery 由 router.Load 统一挂载。
+	g := gin.New()
+	g.Use(gin.LoggerWithFormatter(middleware.SensitiveLogFormatter))
 
 	// Routes.
 	router.Load(
