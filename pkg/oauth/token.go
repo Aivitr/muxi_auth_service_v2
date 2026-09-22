@@ -87,11 +87,13 @@ func ResolvePrincipalFromToken(token string) (AccessPrincipal, error) {
 	return ResolvePrincipalFromSubject(subject)
 }
 
-// BuildCASUserInfo 会为历史 CAS 主体构造一个最小用户信息响应。
+// BuildCASUserInfo 只为反查不到本地账号的历史 CAS 主体兜底，一律按非成员返回。
+// Roles 必须显式给非 nil 切片。
 func BuildCASUserInfo(casUsername string) *model.UserInfo {
 	return &model.UserInfo{
 		Username: casUsername,
 		Info:     "cas authenticated user",
+		Roles:    []string{model.RoleNameUser},
 	}
 }
 

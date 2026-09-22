@@ -18,7 +18,7 @@ func setupCASIdentityTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("open test database failed: %v", err)
 	}
 	db.LogMode(false)
-	if err := db.AutoMigrate(&model.UserModel{}, &model.UserIdentity{}).Error; err != nil {
+	if err := db.AutoMigrate(&model.UserModel{}, &model.UserIdentity{}, &model.MemberProfile{}).Error; err != nil {
 		db.Close()
 		t.Fatalf("migrate test database failed: %v", err)
 	}

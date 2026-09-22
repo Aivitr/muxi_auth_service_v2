@@ -5,6 +5,7 @@ import (
 
 	"github.com/Muxi-X/muxi_auth_service_v2/handler/check"
 	"github.com/Muxi-X/muxi_auth_service_v2/handler/email"
+	"github.com/Muxi-X/muxi_auth_service_v2/handler/member"
 	"github.com/Muxi-X/muxi_auth_service_v2/handler/oauth"
 	"github.com/Muxi-X/muxi_auth_service_v2/handler/password"
 	"github.com/Muxi-X/muxi_auth_service_v2/handler/sd"
@@ -59,6 +60,12 @@ func Load(g *gin.Engine, mw ...gin.HandlerFunc) *gin.Engine {
 	adminRouter.Use(middleware.AdminRequiredMiddleware())
 	{
 		adminRouter.POST("/oauth/store", oauth.AdminStore)
+
+		adminRouter.GET("/members", member.List)
+		adminRouter.POST("/members", member.Create)
+		adminRouter.PUT("/members/:user_id", member.Update)
+		adminRouter.DELETE("/members/:user_id", member.Delete)
+		adminRouter.GET("/users/search", member.SearchUsers)
 	}
 
 	// The health check handlers

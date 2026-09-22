@@ -62,6 +62,13 @@ func Auth(c *gin.Context) {
 
 	req.UserID = strconv.Itoa(int(user.Id))
 
+	// 本端点的其他失败（ErrUserNotFound 等）都是 HTTP 200 + 业务码，
+	// 只有这一条走 403，前端需要单独处理非 200 分支。
+	if err := service.CheckMuxiMemberScope(req.UserID, req.Scope); err != nil {
+		handler.SendForbidden(c, err, nil, "muxi:member scope requires a muxi member account")
+		return
+	}
+
 	// 可设置token过期时间（秒）
 	if tokenExp, ok := c.GetQuery("token_exp"); ok {
 		exp, err := strconv.ParseInt(tokenExp, 10, 64)

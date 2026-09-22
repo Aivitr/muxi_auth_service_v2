@@ -40,6 +40,8 @@ func Refresh(c *gin.Context) {
 		return
 	}
 
+	// 禁止传 Scope：客户端塞一个 scope=muxi:member 就能自己给自己提权，
+	// 绕过 CheckMuxiMemberScope。另一道保险见 pkg/oauth/server.go。
 	tgr := &oauth2.TokenGenerateRequest{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,

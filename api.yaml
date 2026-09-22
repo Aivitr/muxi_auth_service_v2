@@ -18,6 +18,8 @@ tags:
     description: "oauth2 API"
   - name: "profile"
     description: "profile API"
+  - name: "admin"
+    description: "管理员接口，需要本地管理员账号的 access token"
 schemes:
   - "https"
   - "http"
@@ -287,6 +289,11 @@ paths:
           required: false
           type: string
           description: 过期时间（s）
+        - in: query
+          name: scope
+          required: false
+          type: string
+          description: "空格分隔的 scope 列表。带上 `muxi:member` 时只有木犀团队成员能拿到授权码。**必须放 query，放 body 读不到** —— `client_id` 那几个参数走的是 `r.FormValue`，JSON body 不会被解析。"
         - in: body
           name: data
           schema:
@@ -309,6 +316,8 @@ paths:
                 type: string
               expired:
                 type: integer
+        403:
+          description: "请求了 `muxi:member` 但当前账号不是木犀团队成员（错误码 40008）。注意这是本接口唯一一个走非 200 的分支，其他失败都是 HTTP 200 + 业务错误码，前端需要单独处理。"
 
   /oauth/token:
     post:
@@ -491,6 +500,7 @@ paths:
       tags:
         - "profile"
       summary: "get user info"
+      description: "下游判断账号是不是木犀成员的唯一入口。`is_muxi_member` 和 `member_profile` 是新增字段；`roles` 永远是非空数组。OAuth scope 只在授权时拦截，做不到每次业务请求鉴权，所以已签发的 token 是否仍然对应一个在册成员，必须靠回查本接口。"
       parameters:
         - in: header
           name: token
@@ -502,6 +512,224 @@ paths:
           description: OK
           schema:
             $ref: "#/definitions/UserInfo"
+
+  /admin/members:
+    get:
+      tags:
+        - "admin"
+      summary: "list muxi members"
+      description: "需要本地管理员账号的 access token。"
+      parameters:
+        - in: header
+          name: token
+          description: "OAuth access token for a local admin user."
+          required: true
+          type: string
+        - in: query
+          name: page
+          required: false
+          type: integer
+          description: "从 1 开始，默认 1"
+        - in: query
+          name: page_size
+          required: false
+          type: integer
+          description: "默认 20，上限 100，超出会被压到 100"
+        - in: query
+          name: group
+          required: false
+          type: string
+          description: "按组别精确过滤"
+        - in: query
+          name: query
+          required: false
+          type: string
+          description: "模糊匹配 real_name / student_id / username / email"
+      responses:
+        200:
+          description: ok
+          schema:
+            $ref: "#/definitions/MemberList"
+        401:
+          description: "Invalid or missing access token."
+        403:
+          description: "Admin permission is required."
+    post:
+      tags:
+        - "admin"
+      summary: "grant muxi membership to an existing account"
+      description: "把已有账号授权为木犀成员。学号唯一性在应用层校验，空学号豁免。"
+      consumes:
+        - "application/json"
+      produces:
+        - "application/json"
+      parameters:
+        - in: header
+          name: token
+          description: "OAuth access token for a local admin user."
+          required: true
+          type: string
+        - in: body
+          name: data
+          schema:
+            required:
+              - user_id
+              - group
+            properties:
+              user_id:
+                type: integer
+              real_name:
+                type: string
+              student_id:
+                type: string
+              group:
+                type: string
+                description: "Frontend / Backend / Design / Product / Operation 之一"
+              join_year:
+                type: integer
+              personal_blog:
+                type: string
+              github:
+                type: string
+              zhihu:
+                type: string
+      responses:
+        200:
+          description: ok
+          schema:
+            $ref: "#/definitions/MemberProfile"
+        400:
+          description: "组别不在白名单（20603）、学号已被占用（20604）、或者该账号已经是成员（20602）。"
+        401:
+          description: "Invalid or missing access token."
+        403:
+          description: "Admin permission is required."
+        404:
+          description: "user_id 对应的账号不存在（20102）。"
+
+  /admin/members/{user_id}:
+    put:
+      tags:
+        - "admin"
+      summary: "update a muxi member profile"
+      description: "请求体里所有字段可选，零值表示不改这一项。因为空值等于不修改，所以这个接口没法把字段改回空串。"
+      consumes:
+        - "application/json"
+      produces:
+        - "application/json"
+      parameters:
+        - in: header
+          name: token
+          description: "OAuth access token for a local admin user."
+          required: true
+          type: string
+        - in: path
+          name: user_id
+          required: true
+          type: integer
+        - in: body
+          name: data
+          schema:
+            properties:
+              real_name:
+                type: string
+              student_id:
+                type: string
+              group:
+                type: string
+              join_year:
+                type: integer
+              personal_blog:
+                type: string
+              github:
+                type: string
+              zhihu:
+                type: string
+      responses:
+        200:
+          description: ok
+          schema:
+            $ref: "#/definitions/MemberProfile"
+        400:
+          description: "组别不在白名单（20603）或学号已被别的成员占用（20604）。"
+        401:
+          description: "Invalid or missing access token."
+        403:
+          description: "Admin permission is required."
+        404:
+          description: "该账号不是木犀成员（20601）。"
+    delete:
+      tags:
+        - "admin"
+      summary: "revoke a muxi membership"
+      description: "删除成员档案，并撤销该用户已签发的 OAuth token。注意撤销只能让 refresh token 立即失效：已签发的 access token 是自包含的 JWT，在剩余有效期内（最长 30 天）仍可通过本地验签使用，要做到即时失效，下游必须回查 GET /user。"
+      parameters:
+        - in: header
+          name: token
+          description: "OAuth access token for a local admin user."
+          required: true
+          type: string
+        - in: path
+          name: user_id
+          required: true
+          type: integer
+      responses:
+        200:
+          description: ok
+        401:
+          description: "Invalid or missing access token."
+        403:
+          description: "Admin permission is required."
+        404:
+          description: "该账号不是木犀成员（20601）。"
+
+  /admin/users/search:
+    get:
+      tags:
+        - "admin"
+      summary: "search accounts for member authorization"
+      parameters:
+        - in: header
+          name: token
+          description: "OAuth access token for a local admin user."
+          required: true
+          type: string
+        - in: query
+          name: q
+          required: true
+          type: string
+          description: "匹配 username / email / student_id，最多返回 20 条。"
+      responses:
+        200:
+          description: ok
+          schema:
+            type: object
+            properties:
+              list:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    user_id:
+                      type: integer
+                    username:
+                      type: string
+                    email:
+                      type: string
+                    avatar_url:
+                      type: string
+                    real_name:
+                      type: string
+                    student_id:
+                      type: string
+                    is_muxi_member:
+                      type: boolean
+        400:
+          description: "缺少 q。"
+        401:
+          description: "Invalid or missing access token."
+        403:
+          description: "Admin permission is required."
 
 definitions:
   UserSignup:
@@ -588,6 +816,22 @@ definitions:
   UserInfo:
     type: "object"
     properties:
+      user_id:
+        type: integer
+        description: "本地账号 id。历史 cas:<username> token 反查不到本地账号时为 0。"
+      student_id:
+        type: string
+      is_muxi_member:
+        type: boolean
+        description: "下游判断内部成员身份就认这个字段。"
+      roles:
+        type: array
+        description: "永远是非空数组（不会出现 null），可能包含 user / muxi_member / moderator / admin。"
+        items:
+          type: string
+      member_profile:
+        description: "非成员为 null，用之前先判空。"
+        $ref: "#/definitions/MemberProfile"
       email:
         type: string
       birthday:
@@ -620,3 +864,53 @@ definitions:
         type: string
       zhihu:
         type: string
+  MemberProfile:
+    type: "object"
+    properties:
+      user_id:
+        type: integer
+      real_name:
+        type: string
+      student_id:
+        type: string
+      group:
+        type: string
+        description: "管理端写入时只接受 Frontend / Backend / Design / Product / Operation；读出来可能是「前端」「Android」这类历史自由文本，不要拿白名单过滤。"
+      join_year:
+        type: integer
+        description: "老数据里 timejoin 解析不出年份时为 null。"
+      personal_blog:
+        type: string
+      github:
+        type: string
+      zhihu:
+        type: string
+      created_at:
+        type: string
+        description: "RFC3339。历史成员取的是迁移时刻，不是真实入队时间。"
+      updated_at:
+        type: string
+  MemberListItem:
+    allOf:
+      - $ref: "#/definitions/MemberProfile"
+      - type: "object"
+        properties:
+          username:
+            type: string
+          email:
+            type: string
+          avatar_url:
+            type: string
+  MemberList:
+    type: "object"
+    properties:
+      list:
+        type: array
+        items:
+          $ref: "#/definitions/MemberListItem"
+      total:
+        type: integer
+      page:
+        type: integer
+      page_size:
+        type: integer

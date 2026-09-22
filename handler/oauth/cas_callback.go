@@ -35,6 +35,9 @@ func CASCallback(c *gin.Context) {
 		case errors.Is(err, service.ErrInvalidCASTicket):
 			handler.SendUnauthorized(c, errno.ErrInvalidCASTicket, nil, err.Error())
 			return
+		case errors.Is(err, errno.ErrNotMuxiMember):
+			handler.SendForbidden(c, errno.ErrNotMuxiMember, nil, "muxi:member scope requires a muxi member account")
+			return
 		default:
 			handler.SendError(c, errno.ErrGenerateAuthCode, nil, err.Error())
 			return

@@ -33,6 +33,12 @@ var (
 	// captcha error
 	ErrUserVerifyFail = &Errno{Code: 20501, Message: "Verify captcha token failed."}
 
+	// member profile error
+	ErrMemberProfileNotFound = &Errno{Code: 20601, Message: "Member profile not found."}
+	ErrMemberProfileExisted  = &Errno{Code: 20602, Message: "The user is already a muxi member."}
+	ErrInvalidMemberGroup    = &Errno{Code: 20603, Message: "Member group is invalid."}
+	ErrStudentIDExisted      = &Errno{Code: 20604, Message: "The student id is already used by another member."}
+
 	// orm error
 	ErrUserCreate = &Errno{Code: 30001, Message: "The (*UserModel)Create() method error."}
 	ErrUserUpdate = &Errno{Code: 30002, Message: "The (*UserModel)Update() method error."}
@@ -45,4 +51,5 @@ var (
 	ErrInvalidCASTicket                = &Errno{Code: 40005, Message: "The CAS ticket was invalid."}
 	ErrOAuthClientRegistrationDisabled = &Errno{Code: 40006, Message: "OAuth client registration is temporarily disabled."}
 	ErrOAuthClientCreate               = &Errno{Code: 40007, Message: "Error occurred while creating oauth client."}
+	ErrNotMuxiMember                   = &Errno{Code: 40008, Message: "The account is not a muxi member."}
 )

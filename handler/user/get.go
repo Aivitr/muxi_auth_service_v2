@@ -11,13 +11,21 @@ import (
 func Get(c *gin.Context) {
 	principal := c.MustGet("principal").(oauth.AccessPrincipal)
 
-	// 兼容旧的 cas:<username> access token；新签发的 CAS token 已统一为本地 user id。
-	if principal.CASUsername != "" {
+	userID := principal.LocalUserID
+	// 兼容旧的 cas:<username> access token（新签发的已统一为本地 user id）。
+	// 反查一下本地账号，让这批历史 token 也能拿到正确的 is_muxi_member。
+	if userID == 0 && principal.CASUsername != "" {
+		if identity, err := model.GetUserIdentity("cas", principal.CASUsername); err == nil {
+			userID = identity.UserID
+		}
+	}
+
+	if userID == 0 {
 		handler.SendResponse(c, nil, oauth.BuildCASUserInfo(principal.CASUsername))
 		return
 	}
 
-	user, err := model.GetUserInfoByID(principal.LocalUserID)
+	user, err := model.GetUserInfoByID(userID)
 	if err != nil {
 		handler.SendError(c, err, nil, err.Error())
 		return

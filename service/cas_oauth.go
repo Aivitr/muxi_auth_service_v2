@@ -54,6 +54,9 @@ type AuthorizeCodeRequest struct {
 	UserID         string
 	CallbackURL    string
 	AccessTokenExp time.Duration
+	// Scope 只让 oauth2_token.data 留下审计痕迹，没有任何代码读它，
+	// 别指望这个字段承担成员校验职责。
+	Scope string
 }
 
 // AuthorizeCodeResult 表示授权码生成结果。
@@ -189,12 +192,19 @@ func (f *CASOAuthFlow) HandleCallback(ctx context.Context, request *http.Request
 		return nil, err
 	}
 
+	// 校验必须放在这个分支：上面缺 client_id 的 retry 分支既没有 userID，也不该被拦。
+	scope := strings.TrimSpace(request.URL.Query().Get("scope"))
+	if err := CheckMuxiMemberScope(userID, scope); err != nil {
+		return nil, err
+	}
+
 	// 签发code
 	codeResult, err := f.codeGenerator.GenerateAuthorizeCode(ctx, AuthorizeCodeRequest{
 		ClientID:       clientID,
 		UserID:         userID,
 		CallbackURL:    callbackURL,
 		AccessTokenExp: accessTokenExp,
+		Scope:          scope,
 	})
 	if err != nil {
 		return nil, err
@@ -482,6 +492,7 @@ func (g *defaultAuthorizeCodeGenerator) GenerateAuthorizeCode(ctx context.Contex
 		RedirectURI:    request.CallbackURL,
 		UserID:         request.UserID,
 		AccessTokenExp: request.AccessTokenExp,
+		Scope:          request.Scope,
 	}
 
 	tokenInfo, err := pkgoauth.OauthServer.Server.GetAuthorizeToken(ctx, authorizeRequest)

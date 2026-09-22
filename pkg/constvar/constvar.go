@@ -1,11 +1,26 @@
 package constvar
 
-import "github.com/gin-gonic/gin"
+import (
+	"slices"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+)
 
 const (
 	DefaultLimit                = 50
 	PermissionOAuthClientManage = 1
-	EmailTemp                   = `<table border="0" cellspacing="0" cellpadding="0" style="max-width: 600px;">
+
+	// 木犀团队成员所属组别，仅用于管理端写入校验
+	MemberGroupFrontend  = "Frontend"
+	MemberGroupBackend   = "Backend"
+	MemberGroupDesign    = "Design"
+	MemberGroupProduct   = "Product"
+	MemberGroupOperation = "Operation"
+
+	// ScopeMuxiMember 是内部业务系统申请“仅木犀成员可访问”时携带的 OAuth scope
+	ScopeMuxiMember = "muxi:member"
+	EmailTemp       = `<table border="0" cellspacing="0" cellpadding="0" style="max-width: 600px;">
 	<tbody>
 		<tr height="16"></tr>
 		<tr>
@@ -91,3 +106,26 @@ var (
 	TestRouter *gin.Engine
 	Token      string
 )
+
+var MemberGroups = []string{
+	MemberGroupFrontend,
+	MemberGroupBackend,
+	MemberGroupDesign,
+	MemberGroupProduct,
+	MemberGroupOperation,
+}
+
+// IsValidMemberGroup 只用于管理端写入校验。
+// 历史 users.group 里有“前端”“Android”这类自由文本，读路径不能拿白名单过滤。
+func IsValidMemberGroup(group string) bool {
+	return slices.Contains(MemberGroups, group)
+}
+
+// HasScope 按 OAuth 2.0 的空格分隔切分，顺带兼容逗号。
+func HasScope(rawScope, target string) bool {
+	fields := strings.FieldsFunc(rawScope, func(r rune) bool {
+		return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == ','
+	})
+
+	return slices.Contains(fields, target)
+}

@@ -89,6 +89,15 @@ func serverConfig(srv *server.Server) {
 	srv.SetClientAuthorizedHandler(func(clientID string, grant oauth2.GrantType) (allowed bool, err error) {
 		return true, nil
 	})
+
+	// RefreshingScopeHandler 禁止在 refresh 时改动 scope：谁能让 refresh 带上 scope，
+	// 谁就能给自己的 token 加 muxi:member，绕过 CheckMuxiMemberScope。
+	//
+	// 今天这条路径是死的（handler/oauth/refresh.go 没给 tgr 设 Scope），
+	// 但那是「一行代码之差」的安全边界，真有人补上 Scope 时这里一律 false 兜住。
+	srv.SetRefreshingScopeHandler(func(newScope, oldScope string) (allowed bool, err error) {
+		return false, nil
+	})
 }
 
 func getManager() *manage.Manager {

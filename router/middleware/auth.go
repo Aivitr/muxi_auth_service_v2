@@ -3,7 +3,6 @@ package middleware
 import (
 	"github.com/Muxi-X/muxi_auth_service_v2/handler"
 	"github.com/Muxi-X/muxi_auth_service_v2/model"
-	"github.com/Muxi-X/muxi_auth_service_v2/pkg/constvar"
 	"github.com/Muxi-X/muxi_auth_service_v2/pkg/errno"
 	"github.com/Muxi-X/muxi_auth_service_v2/pkg/oauth"
 
@@ -45,7 +44,7 @@ func AdminRequiredMiddleware() gin.HandlerFunc {
 		}
 
 		user, err := model.GetUserByID(principal.LocalUserID)
-		if err != nil || !canManageOAuthClients(user) {
+		if err != nil || !model.HasAdminAccess(user) {
 			handler.SendForbidden(c, errno.ErrPermissionDenied, nil, "admin permission is required")
 			c.Abort()
 			return
@@ -56,19 +55,4 @@ func AdminRequiredMiddleware() gin.HandlerFunc {
 		c.Set("adminUser", user)
 		c.Next()
 	}
-}
-
-func canManageOAuthClients(user *model.UserModel) bool {
-	if user == nil {
-		return false
-	}
-	if user.IsAdmin() {
-		return true
-	}
-
-	role, err := model.GetRoleByID(user.RoleID)
-	if err != nil || role == nil {
-		return false
-	}
-	return role.Permissions&constvar.PermissionOAuthClientManage != 0
 }
